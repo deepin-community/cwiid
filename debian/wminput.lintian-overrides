@@ -1,0 +1,9 @@
+# the .so plugin libraries weigh approximately 25 kB, so they can be static.
+
+wminput: shared-library-lacks-prerequisites usr/lib/cwiid/plugins/acc.so
+wminput: shared-library-lacks-prerequisites usr/lib/cwiid/plugins/ir_fps.so
+wminput: shared-library-lacks-prerequisites usr/lib/cwiid/plugins/ir_ptr.so
+wminput: shared-library-lacks-prerequisites usr/lib/cwiid/plugins/led.so
+wminput: shared-library-lacks-prerequisites usr/lib/cwiid/plugins/nunchuk_acc.so
+wminput: shared-library-lacks-prerequisites usr/lib/cwiid/plugins/nunchuk_kb.so
+wminput: shared-library-lacks-prerequisites usr/lib/cwiid/plugins/nunchuk_stick2btn.so

@@ -1,0 +1,24 @@
+Index: cwiid/wminput/Makefile.in
+===================================================================
+--- cwiid.orig/wminput/Makefile.in
++++ cwiid/wminput/Makefile.in
+@@ -15,7 +15,9 @@ CFLAGS += -fPIC -I@top_builddir@/libcwii
+ 	-DCWIID_PLUGINS_DIR=\"$(CWIID_PLUGINS_DIR)\"
+ 
+ LDLIBS += -lcwiid -ldl -lbluetooth
+-LDFLAGS += -L@top_builddir@/libcwiid -rdynamic -shared
++# LDFLAGS += -L@top_builddir@/libcwiid -rdynamic -shared
++# why -shared ??
++LDFLAGS += -L@top_builddir@/libcwiid -rdynamic
+ INST_DIR = @bindir@
+ 
+ YFLAGS += -d
+@@ -42,7 +44,7 @@ make_plugins:
+ 
+ install_configs:
+ 	install -d $(WMINPUT_CONFIG_DIR)
+-	install configs/* $(WMINPUT_CONFIG_DIR)
++	install -m 644 configs/* $(WMINPUT_CONFIG_DIR)
+ 	ln -sf acc_led $(WMINPUT_CONFIG_DIR)/default
+ 
+ #uninstall_configs:

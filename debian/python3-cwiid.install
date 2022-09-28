@@ -1,0 +1,3 @@
+debian/tmp/usr/lib/python*
+usr/share/doc/cwiid/Xmodmap        usr/share/doc/python3-cwiid
+usr/share/doc/cwiid/wminput.list   usr/share/doc/python3-cwiid

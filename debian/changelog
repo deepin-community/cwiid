@@ -1,0 +1,259 @@
+cwiid (0.6.91-4) UNRELEASED; urgency=medium
+
+  * update
+
+ -- Georges Khaznadar <georgesk@debian.org>  Tue, 26 Jul 2022 13:57:44 +0800
+
+cwiid (0.6.91-4) unstable; urgency=medium
+
+  * applied Bernd Zeimetz' merge request, thanks! Closes: #976439
+
+ -- Georges Khaznadar <georgesk@debian.org>  Thu, 19 May 2022 17:04:35 +0200
+
+cwiid (0.6.91-3) unstable; urgency=medium
+
+  * applied Graham Inggs' patch, thanks!
+  * bumped Standards-Version: 4.6.1, debhelper-compat (= 13)
+  * use pybuild as a build system
+  * installed two missing files (doc/Xmodmap, doc/wminput.list) to
+    usr/share/doc/python3-cwiid for package python3-cwiid
+
+ -- Georges Khaznadar <georgesk@debian.org>  Fri, 08 Apr 2022 19:09:29 +0200
+
+cwiid (0.6.91-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload
+
+  [ Graham Inggs ]
+  * Support Python with 2-digit minor version (Closes: #1008688)
+
+ -- Sebastian Ramacher <sramacher@debian.org>  Thu, 07 Apr 2022 00:27:18 +0200
+
+cwiid (0.6.91-2) unstable; urgency=medium
+
+  * modified the debian patch "wminput-Makefile.in.patch", after
+    Bernhard Übelacker's suggestion, Thanks! Closes: #970763;
+    however wminput still lacks some changes to support Python3
+
+ -- Georges Khaznadar <georgesk@debian.org>  Wed, 11 Nov 2020 12:39:34 +0100
+
+cwiid (0.6.91-1) unstable; urgency=medium
+
+  * modified the upstream branch, as upstream development seems to be dead
+  * submitted a RFA to adopt the package
+  * added build-dependencies on  python3-dev, libpython3-dev
+  * removed the m suffix for libraries
+  * changed the watch file to consider the Github repository
+  * changed d/rules, to use dh
+  * new binary package: python-cwiid becomes python3-cwiid;
+    Closes: #952496
+  * upgraded Standards-Version, use debhelpercompat(=12)
+  * added VCS information in d/control
+  * added myself as maintainer. Closes: #810992; Closes: #965268
+  * removed debian/wmgui.menu, since debian/menus/wmgui.desktop is enough
+  * removed the package cwiid-dbg which was built as an empty package
+  * patched wminput/Makefile.in to avoid executable flags for ordinary files
+  
+ -- Georges Khaznadar <georgesk@debian.org>  Sat, 18 Jul 2020 16:58:03 +0200
+
+cwiid (0.6.00+svn201-4) unstable; urgency=medium
+
+  * QA upload.
+  * Set maintainer to Debian QA Group. (see #810992)
+  * Build with automake instead of automake1.11 (Closes: #865156)
+  * Fix typo in the libcwiid-dev package description. (Closes: #658942)
+  * Remove configure and ltmain.sh in the clean target to fix building
+    twice in a row.
+
+ -- Adrian Bunk <bunk@debian.org>  Mon, 26 Jun 2017 09:05:53 +0300
+
+cwiid (0.6.00+svn201-3.2) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Switch to dh_python2 (Closes: #785989).
+
+ -- Luca Falavigna <dktrkranz@debian.org>  Sat, 12 Sep 2015 18:35:59 +0200
+
+cwiid (0.6.00+svn201-3.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * debian/control, debian/rules: Switch to automake1.11. (Closes:
+    #724362)
+
+ -- Eric Dorland <eric@debian.org>  Sun, 16 Feb 2014 02:46:48 -0500
+
+cwiid (0.6.00+svn201-3) unstable; urgency=low
+
+  * Bumped standards version to 3.9.2
+  * Switched to package format 3.0 (quilt)
+  * Fixed FTBFS with binutils-gold. Thanks to 
+    Peter Fritzsche for reporting and Matthias Klose
+    for providing a patch.
+  Closes: #554297
+  * Fixed typos in debian/control
+  Closes: #557684, #557854, #557856
+  * Fixed url in debian/copyright.
+  Closes: #591067
+  * Dropped transitional libcwiid1-dev package.
+
+ -- Romain Beauxis <toots@rastageeks.org>  Sat, 23 Apr 2011 16:45:50 -0500
+
+cwiid (0.6.00+svn201-2) unstable; urgency=low
+
+  * Fixe cwiid.pc 
+  Closes: #548866
+  * Updated debian/copyright
+
+ -- Romain Beauxis <toots@rastageeks.org>  Tue, 29 Sep 2009 14:30:48 -0500
+
+cwiid (0.6.00+svn201-1) unstable; urgency=low
+
+  * New svn snapshot.
+  * Dropped patch applied upstream.
+  * Bumped standards version to 3.8.3 
+  * Added debug package.
+  * Added Homepage: tag in debian/control
+  * Renamed libcwiid1-dev to libcwiid-dev
+  * Install cwiid.pc file in libcwiid-dev 
+    to enable pkg-config support.
+
+ -- Romain Beauxis <toots@rastageeks.org>  Mon, 28 Sep 2009 00:04:05 -0500
+
+cwiid (0.6.00+svn184-2) unstable; urgency=low
+
+  * Added patch from upstream's revision 186.
+  Closes: #458303 
+  * Bumped standards version to 3.8.2
+
+ -- Romain Beauxis <toots@rastageeks.org>  Sun, 09 Aug 2009 21:09:14 -0500
+
+cwiid (0.6.00+svn184-1) unstable; urgency=low
+
+  * New upstream release.
+  * Fixed build-dep on bluez.
+  Closes: #501510
+  * Fixed python's threading conventions (upstream)
+  Closes: #490607
+  * Removed mention on missing wminput.conf.sample in wminput manpage
+  Closes: #458245
+  * Added extra plugins.
+  Closes: #487498
+  * Updated compat to level 7.
+  * Bumped standards version to 3.8.1
+
+ -- Romain Beauxis <toots@rastageeks.org>  Fri, 27 Mar 2009 11:36:50 +0100
+
+cwiid (0.6.00-4) unstable; urgency=low
+
+  * Removed buggy LDFLAGS from debian/rules
+  Closes: #476004
+  * Rebuild against new python
+
+ -- Romain Beauxis <toots@rastageeks.org>  Mon, 14 Apr 2008 15:32:08 +0100
+
+cwiid (0.6.00-3) unstable; urgency=high
+
+  * Added dependency on libbluetooth-dev for libcwiid1-dev
+  Closes: #458827
+  * Fixed watch file
+  Closes: #449977
+  * Updated standards to 3.7.3 (no changes)
+  * Added --as-needed flag for wmgui until libraries are fixed.
+
+ -- Romain Beauxis <toots@rastageeks.org>  Mon, 07 Jan 2008 11:40:08 +0100
+
+cwiid (0.6.00-2) unstable; urgency=low
+
+  * Added linker flags to remove non-necessary link dependencies.
+
+ -- Romain Beauxis <toots@rastageeks.org>  Wed, 21 Nov 2007 09:58:28 +0100
+
+cwiid (0.6.00-1) unstable; urgency=low
+
+  * New upstream release 
+
+ -- Romain Beauxis <toots@rastageeks.org>  Mon, 27 Aug 2007 18:44:46 +0200
+
+cwiid (0.6.00~rc2-4) unstable; urgency=low
+
+  * Corrected depends for wminput (Closes: #434295) 
+
+ -- Romain Beauxis <toots@rastageeks.org>  Mon, 23 Jul 2007 01:26:49 +0200
+
+cwiid (0.6.00~rc2-3) unstable; urgency=low
+
+  * Initial upload to unstable for new soversion.
+
+ -- Romain Beauxis <toots@rastageeks.org>  Sun, 22 Jul 2007 16:38:13 +0200
+
+cwiid (0.6.00~rc2-2) experimental; urgency=low
+
+  * Added conflict with old -dev package 
+
+ -- Romain Beauxis <toots@rastageeks.org>  Wed, 18 Jul 2007 02:14:56 +0200
+
+cwiid (0.6.00~rc2-1) experimental; urgency=low
+
+  * New upstream release
+  * Added python packages
+  * New library soversion
+
+ -- Romain Beauxis <toots@rastageeks.org>  Tue, 17 Jul 2007 04:04:29 +0200
+
+cwiid (0.5.03+svn20070508-2) unstable; urgency=low
+
+  * Stupid typo in .install files.. 
+  * Removed autotools-dev from build dependencies
+  * Added conflicts and replaces for new library packages
+
+ -- Romain Beauxis <toots@rastageeks.org>  Sat, 12 May 2007 03:31:29 +0200
+
+cwiid (0.5.03+svn20070508-1) unstable; urgency=low
+
+  * New upstream release
+  * New library soname, changed package names accordingly
+  * New binary lswm
+
+ -- Romain Beauxis <toots@rastageeks.org>  Tue, 08 May 2007 05:31:12 +0200
+
+cwiid (0.5.03-1) unstable; urgency=low
+
+  * New upstream release. 
+  * default configuration link corrected for wminput
+  Closes: #419341
+
+ -- Romain Beauxis <toots@rastageeks.org>  Tue, 24 Apr 2007 14:20:48 +0200
+
+cwiid (0.5.02-1) unstable; urgency=low
+
+  * New upstream release 
+  * Dropped no more needed patches, thanks to upstream author for considering
+    them !
+
+ -- Romain Beauxis <toots@rastageeks.org>  Tue, 20 Mar 2007 13:13:34 +0100
+
+cwiid (0.5.00-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Romain Beauxis <toots@rastageeks.org>  Wed, 21 Feb 2007 14:28:53 +0100
+
+cwiid (0.4.01-1) unstable; urgency=low
+
+  * New upstream release
+  * First upload to unstable (Closes: #407468)
+
+ -- Romain Beauxis <toots@rastageeks.org>  Fri, 26 Jan 2007 12:34:51 +0100
+
+cwiid (0.4.00-1) unstable; urgency=low
+
+  * News upstream release. 
+
+ -- Romain Beauxis <toots@rastageeks.org>  Thu, 25 Jan 2007 12:36:58 +0100
+
+cwiid (0.3.51-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Romain Beauxis <toots@rastageeks.org>  Thu, 18 Jan 2007 19:40:34 +0100
+

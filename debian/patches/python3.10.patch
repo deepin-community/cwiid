@@ -1,0 +1,15 @@
+Description: Support Python with 2-digit minor version
+Author: Graham Inggs <ginggs@debian.org>
+Last-Update: 2022-01-28
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -67,7 +67,7 @@
+ fi
+ AC_SUBST(PYTHON)
+ if test $PYTHON; then
+-	PYTHON_VERSION=[`$PYTHON -c 'import sys; print (sys.version[:3])'`]
++	PYTHON_VERSION=[`$PYTHON -c 'import sys; print ("%d.%d" % sys.version_info[:2])'`]
+ 	AC_SUBST(PYTHON_VERSION)
+ 	AC_DEFINE([HAVE_PYTHON],1,[Define to 1 if python support is enabled])
+ fi

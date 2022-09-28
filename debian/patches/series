@@ -1,0 +1,9 @@
+fix_link_dependencies.patch
+fix_458245.patch
+fix_man_hyphen.patch
+add_other_plugins_#487498.patch
+fix_wiid_pc.patch
+python-setup.py.patch
+wminput-Makefile.in.patch
+python3.10.patch
+python3-build-azzra

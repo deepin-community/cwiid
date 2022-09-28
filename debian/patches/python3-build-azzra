@@ -1,0 +1,1664 @@
+Index: cwiid/python/Wiimote.c
+===================================================================
+--- cwiid.orig/python/Wiimote.c
++++ cwiid/python/Wiimote.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2007 Justin M. Tulloss <jmtulloss@gmail.com>
++ * Copyright (C) 2007 Justin M. Tulloss <jmtulloss@gmail.com>, L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  * Interface from Python to libcwiid
+  *
+@@ -18,96 +18,54 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, 
+  * Boston, MA  02110-1301  USA
+  *
+- * ChangeLog:
+- * 2008-01-19 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * print callback error tracebacks
+- *
+- * 2007-06-18 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * revised error messages and doc strings
+- *
+- * 2007-06-05 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * removed Wiimote_FromC function
+- * * added bdaddr argument to Wiimote.init
+- * * overloaded Wiimote.init to accept CObject (existing wiimote),
+- *   and logic to avoid closing it on dealloc
+- *
+- * 2007-06-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * added Wiimote_FromC
+- * * added get_acc_cal
+- *
+- * 2007-05-27 Arthur Peters <amp@singingwizard.org>
+- * * removed set_mesg_callback from methods table
+- *
+- * 2007-05-22 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * changed disconnect to close
+- * * replaced command with attributes for rpt_mode, rumble, led,
+- *   added request_status method
+- * * fixed memory leak in get_mesg
+- * * added function names to argument parsing errors
+- * * changed to processMesg to ConvertMesgArray with global visibility
+- *
+- * 2007-05-15 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * revised message types
+- * * revised argument/keylist parsing
+- *
+- * 2007-05-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * moved Wiimote class to separate file
+  */
+ 
+ #include "Python.h"
+ #include "structmember.h"
+ #include <errno.h>
+ #include <bluetooth/bluetooth.h>
+-#include "cwiid.h"
+-
+-#if (PY_VERSION_HEX < 0x02050000)
+-  #ifndef PY_SSIZE_T_MIN
+-    typedef int Py_ssize_t;
+-    #define PY_SSIZE_T_MAX INT_MAX
+-    #define PY_SSIZE_T_MIN INT_MIN
+-  #endif
+-#endif
++#include <cwiid.h>
+ 
+ typedef struct {
+ 	PyObject_HEAD
+ 	cwiid_wiimote_t *wiimote;
+-	PyVarObject *callback;
++	PyObject *callback;
+ 	char close_on_dealloc;
+ } Wiimote;
+ 
+ /* method prototypes */
+-static PyVarObject *
+-	Wiimote_new(PyTypeObject *type, PyVarObject *args, PyVarObject *kwds);
++static PyObject *
++	Wiimote_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+ static void Wiimote_dealloc(Wiimote *self);
+-static int Wiimote_init(Wiimote *self, PyVarObject *args, PyVarObject *kwds);
+-static PyVarObject *Wiimote_close(Wiimote *self);
++static int Wiimote_init(Wiimote *self, PyObject *args, PyObject *kwds);
++static PyObject *Wiimote_close(Wiimote *self);
+ 
+-static PyVarObject *Wiimote_enable(Wiimote *self, PyVarObject *args, PyVarObject *kwds);
+-static PyVarObject *
+-	Wiimote_disable(Wiimote *self, PyVarObject *args, PyVarObject *kwds);
++static PyObject *Wiimote_enable(Wiimote *self, PyObject *args, PyObject *kwds);
++static PyObject *
++	Wiimote_disable(Wiimote *self, PyObject *args, PyObject *kwds);
+ 
+ static int
+-	Wiimote_set_mesg_callback(Wiimote *self, PyVarObject *args, void *closure);
+-static PyVarObject *Wiimote_get_mesg(Wiimote *self);
+-static PyVarObject *Wiimote_get_state(Wiimote *self, void *closure);
+-static PyVarObject *Wiimote_get_acc_cal(Wiimote *self, PyVarObject *args,
+-                                     PyVarObject *kwds);
+-static PyVarObject *Wiimote_get_balance_cal(Wiimote *self);
++	Wiimote_set_mesg_callback(Wiimote *self, PyObject *args, void *closure);
++static PyObject *Wiimote_get_mesg(Wiimote *self);
++static PyObject *Wiimote_get_state(Wiimote *self, void *closure);
++static PyObject *Wiimote_get_acc_cal(Wiimote *self, PyObject *args,
++                                     PyObject *kwds);
++static PyObject *Wiimote_get_balance_cal(Wiimote *self);
+ 
+-static PyVarObject *Wiimote_request_status(Wiimote *self);
+-static int Wiimote_set_led(Wiimote *self, PyVarObject *PyLed, void *closure);
++static PyObject *Wiimote_request_status(Wiimote *self);
++static int Wiimote_set_led(Wiimote *self, PyObject *PyLed, void *closure);
+ static int
+-	Wiimote_set_rumble(Wiimote *self, PyVarObject *PyRumble, void *closure);
++	Wiimote_set_rumble(Wiimote *self, PyObject *PyRumble, void *closure);
+ static int
+-	Wiimote_set_rpt_mode(Wiimote *self, PyVarObject *PyRptMode, void *closure);
++	Wiimote_set_rpt_mode(Wiimote *self, PyObject *PyRptMode, void *closure);
+ 
+-static PyVarObject *Wiimote_send_rpt(Wiimote *self, PyVarObject *args, PyVarObject *kwds);
+-static PyVarObject *Wiimote_read(Wiimote *self, PyVarObject *args, PyVarObject *kwds);
+-static PyVarObject *Wiimote_write(Wiimote *self, PyVarObject *args, PyVarObject *kwds);
++static PyObject *Wiimote_send_rpt(Wiimote *self, PyObject *args, PyObject *kwds);
++static PyObject *Wiimote_read(Wiimote *self, PyObject *args, PyObject *kwds);
++static PyObject *Wiimote_write(Wiimote *self, PyObject *args, PyObject *kwds);
+ 
+ /* helper prototypes */
+ static cwiid_mesg_callback_t CallbackBridge;
+-PyVarObject *ConvertMesgArray(int mesg_count, union cwiid_mesg mesg[]);
++PyObject *ConvertMesgArray(int mesg_count, union cwiid_mesg mesg[]);
+ 
+ static PyMethodDef Wiimote_Methods[] =
+ {
+@@ -149,12 +107,11 @@ static PyGetSetDef Wiimote_GetSet[] = {
+ };
+ 
+ PyTypeObject Wiimote_Type = {
+-	PyObject_HEAD_INIT(NULL)
+-	0,						/* ob_size */
+-	"cwiid.Wiimote",		/* tp_name */
+-	sizeof(Wiimote),		/* tp_basicsize */
++	PyVarObject_HEAD_INIT(NULL, 0)
++	"cwiid.Wiimote",				/* tp_name */
++	sizeof(Wiimote),				/* tp_basicsize */
+ 	0,						/* tp_itemsize */
+-	(destructor)Wiimote_dealloc,	/* tp_dealloc */
++	(destructor)Wiimote_dealloc,			/* tp_dealloc */
+ 	0,						/* tp_print */
+ 	0,						/* tp_getattr */
+ 	0,						/* tp_setattr */
+@@ -170,29 +127,29 @@ PyTypeObject Wiimote_Type = {
+ 	0,						/* tp_setattro */
+ 	0,						/* tp_as_buffer */
+ 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
+-	"CWiid Wiimote connection object",	/* tp_doc */
++	"CWiid Wiimote connection object",		/* tp_doc */
+ 	0,						/* tp_traverse */
+ 	0,						/* tp_clear */
+ 	0,						/* tp_richcompare */
+ 	0,						/* tp_weaklistoffset */
+ 	0,						/* tp_iter */
+ 	0,						/* tp_iternext */
+-	Wiimote_Methods,		/* tp_methods */
++	Wiimote_Methods,				/* tp_methods */
+ 	0,						/* tp_members */
+-	Wiimote_GetSet,			/* tp_getset */
++	Wiimote_GetSet,					/* tp_getset */
+ 	0,						/* tp_base */
+ 	0,						/* tp_dict */
+ 	0,						/* tp_descr_get */
+ 	0,						/* tp_descr_set */
+ 	0,						/* tp_dictoffset */
+-	(initproc)Wiimote_init,	/* tp_init */
++	(initproc)Wiimote_init,				/* tp_init */
+ 	0,						/* tp_alloc */
+-	Wiimote_new,			/* tp_new */
++	Wiimote_new,					/* tp_new */
+ };
+ 
+ /* Allocate and deallocate functions */
+-static PyVarObject *
+-	Wiimote_new(PyTypeObject *type, PyVarObject *args, PyVarObject *kwds)
++static PyObject *
++	Wiimote_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+ {
+ 	Wiimote* self;
+ 
+@@ -201,10 +158,9 @@ static PyVarObject *
+ 	}
+ 
+ 	self->wiimote = NULL;
+-	Py_INCREF(self->callback = Py_None);
+ 	self->close_on_dealloc = 0;
+ 
+-	return (PyVarObject*) self;
++	return (PyObject*) self;
+ }
+ 
+ static void Wiimote_dealloc(Wiimote *self)
+@@ -213,13 +169,14 @@ static void Wiimote_dealloc(Wiimote *sel
+ 		cwiid_close(self->wiimote);
+ 	}
+ 	Py_XDECREF(self->callback);
+-	Py_TYPE(self)->tp_free((PyVarObject *)self);
++	//self->ob_type->tp_free((PyObject *)self);
++	Py_TYPE(self)->tp_free((PyObject *)self);
+ }
+ 
+-static int Wiimote_init(Wiimote* self, PyVarObject* args, PyVarObject *kwds)
++static int Wiimote_init(Wiimote* self, PyObject* args, PyObject *kwds)
+ {
+ 	static char *kwlist[] = {"bdaddr", "flags", NULL};
+-	PyVarObject *PyObj;
++	PyObject *PyObj;
+ 	cwiid_wiimote_t *wiimote = NULL;
+ 	char *str_bdaddr = NULL;
+ 	bdaddr_t bdaddr;
+@@ -229,8 +186,8 @@ static int Wiimote_init(Wiimote* self, P
+ 	 * an existing CObject.  Otherwise, create a new one */
+ 	if (PyTuple_Size(args) == 1) {
+ 		PyObj = PyTuple_GET_ITEM(args, 0);
+-		if (PyCObject_Check(PyObj)) {
+-			wiimote = PyCObject_AsVoidPtr(PyObj);
++		if (PyCapsule_CheckExact(PyObj)) {
++			wiimote = PyCapsule_GetPointer(PyObj, "dynamr");
+ 			self->close_on_dealloc = 0;
+ 		}
+ 	}
+@@ -251,6 +208,10 @@ static int Wiimote_init(Wiimote* self, P
+ 			bdaddr = *BDADDR_ANY;
+ 		}
+ 
++        if (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 5) {
++            PyEval_InitThreads();
++        }
++
+ 		Py_BEGIN_ALLOW_THREADS
+ 		wiimote = cwiid_open(&bdaddr, flags);
+ 		Py_END_ALLOW_THREADS
+@@ -265,13 +226,14 @@ static int Wiimote_init(Wiimote* self, P
+ 	}
+ 
+ 	cwiid_set_data(wiimote, self);
++	Py_INCREF(self->callback = Py_None);
+ 	self->wiimote = wiimote;
+ 	return 0;
+ }
+ 
+ #define SET_CLOSED_ERROR	PyErr_SetString(PyExc_ValueError, "Wiimote is closed")
+ 
+-static PyVarObject *Wiimote_close(Wiimote *self)
++static PyObject *Wiimote_close(Wiimote *self)
+ {
+ 	if (!self->wiimote) {
+ 		SET_CLOSED_ERROR;
+@@ -289,7 +251,7 @@ static PyVarObject *Wiimote_close(Wiimot
+ 	Py_RETURN_NONE;
+ }
+ 
+-static PyVarObject *Wiimote_enable(Wiimote *self, PyVarObject *args, PyVarObject *kwds)
++static PyObject *Wiimote_enable(Wiimote *self, PyObject *args, PyObject *kwds)
+ {
+ 	static char *kwlist[] = {"flags", NULL};
+ 	int flags;
+@@ -312,7 +274,7 @@ static PyVarObject *Wiimote_enable(Wiimo
+ 	Py_RETURN_NONE;
+ }
+ 
+-static PyVarObject *Wiimote_disable(Wiimote *self, PyVarObject *args, PyVarObject *kwds)
++static PyObject *Wiimote_disable(Wiimote *self, PyObject *args, PyObject *kwds)
+ {
+ 	static char *kwlist[] = {"flags", NULL};
+ 	int flags;
+@@ -336,10 +298,10 @@ static PyVarObject *Wiimote_disable(Wiim
+ }
+ 
+ static int
+-	Wiimote_set_mesg_callback(Wiimote *self, PyVarObject *NewCallback,
++	Wiimote_set_mesg_callback(Wiimote *self, PyObject *NewCallback,
+ 	                          void *closure)
+ {
+-	PyVarObject *OldCallback;
++	PyObject *OldCallback;
+ 
+ 	if (!self->wiimote) {
+ 		SET_CLOSED_ERROR;
+@@ -368,17 +330,18 @@ static int
+ 
+ 	Py_INCREF(NewCallback);
+ 	Py_DECREF(OldCallback);
++
+ 	self->callback = NewCallback;
+ 
+ 	return 0;
+ }
+ 
+-static PyVarObject *Wiimote_get_mesg(Wiimote *self)
++static PyObject *Wiimote_get_mesg(Wiimote *self)
+ {
+ 	union cwiid_mesg *mesg;
+ 	int mesg_count;
+ 	struct timespec t;
+-	PyVarObject *PyMesg;
++	PyObject *PyMesg;
+ 
+ 	if (!self->wiimote) {
+ 		SET_CLOSED_ERROR;
+@@ -403,10 +366,10 @@ static PyVarObject *Wiimote_get_mesg(Wii
+ 	return PyMesg;
+ }
+ 
+-static PyVarObject *Wiimote_get_state(Wiimote* self, void *closure)
++static PyObject *Wiimote_get_state(Wiimote* self, void *closure)
+ {
+ 	struct cwiid_state state;
+-	PyVarObject *PyState;
++	PyObject *PyState;
+ 
+ 	if (!self->wiimote) {
+ 		SET_CLOSED_ERROR;
+@@ -427,7 +390,7 @@ static PyVarObject *Wiimote_get_state(Wi
+ 	                        "error", state.error);
+ 
+ 	if (state.rpt_mode & CWIID_RPT_BTN) {
+-		PyVarObject *PyBtn = Py_BuildValue("I", state.buttons);
++		PyObject *PyBtn = Py_BuildValue("I", state.buttons);
+ 		if (!PyBtn) {
+ 			Py_DECREF(PyState);
+ 			return NULL;
+@@ -441,7 +404,7 @@ static PyVarObject *Wiimote_get_state(Wi
+ 	}
+ 
+ 	if (state.rpt_mode & CWIID_RPT_ACC) {
+-		PyVarObject *PyAcc = Py_BuildValue("(B,B,B)",
++		PyObject *PyAcc = Py_BuildValue("(B,B,B)",
+ 							            state.acc[CWIID_X],
+ 	                                    state.acc[CWIID_Y],
+ 	                                    state.acc[CWIID_Z]);
+@@ -459,7 +422,7 @@ static PyVarObject *Wiimote_get_state(Wi
+ 
+ 	if (state.rpt_mode & CWIID_RPT_IR) {
+ 		int i;
+-		PyVarObject *PyIr = PyList_New(CWIID_IR_SRC_COUNT);
++		PyObject *PyIr = PyList_New(CWIID_IR_SRC_COUNT);
+ 
+ 		if (!PyIr) {
+ 			Py_DECREF(PyState);
+@@ -475,8 +438,8 @@ static PyVarObject *Wiimote_get_state(Wi
+ 		Py_DECREF(PyIr);
+ 
+ 		for (i=0; i < CWIID_IR_SRC_COUNT; i++) {
+-			PyVarObject *PyIrSrc;
+-			PyVarObject *PySize;
++			PyObject *PyIrSrc;
++			PyObject *PySize;
+ 
+ 			if (state.ir_src[i].valid) {
+ 				PyIrSrc = Py_BuildValue("{s:(I,I)}",
+@@ -489,7 +452,7 @@ static PyVarObject *Wiimote_get_state(Wi
+ 				}
+ 
+ 				if (state.ir_src[i].size != -1) {
+-					if (!(PySize = PyInt_FromLong(
++					if (!(PySize = PyLong_FromLong(
+ 					  (long)state.ir_src[i].size))) {
+ 						Py_DECREF(PyState);
+ 						Py_DECREF(PyIrSrc);
+@@ -514,7 +477,7 @@ static PyVarObject *Wiimote_get_state(Wi
+ 	}
+ 
+ 	switch (state.ext_type) {
+-		PyVarObject *PyExt;
++		PyObject *PyExt;
+ 	case CWIID_EXT_NUNCHUK:
+ 		if (state.rpt_mode & CWIID_RPT_NUNCHUK) {
+ 			PyExt = Py_BuildValue("{s:(B,B),s:(B,B,B),s:I}",
+@@ -596,11 +559,15 @@ static PyVarObject *Wiimote_get_state(Wi
+ 		break;
+ 	case CWIID_EXT_MOTIONPLUS:
+ 		if (state.rpt_mode & CWIID_RPT_MOTIONPLUS) {
+-			PyExt = Py_BuildValue("{s:(I,I,I)}",
++			PyExt = Py_BuildValue("{s:(I,I,I),s:(I,I,I)}",
+ 		                          "angle_rate",
+-		                            state.ext.motionplus.angle_rate[CWIID_PHI],
+-		                            state.ext.motionplus.angle_rate[CWIID_THETA],
+-		                            state.ext.motionplus.angle_rate[CWIID_PSI]);
++                                  state.ext.motionplus.angle_rate[CWIID_PHI],
++                                  state.ext.motionplus.angle_rate[CWIID_THETA],
++                                  state.ext.motionplus.angle_rate[CWIID_PSI],
++                                  "low_speed",
++                                  state.ext.motionplus.low_speed[CWIID_PHI],
++                                  state.ext.motionplus.low_speed[CWIID_THETA],
++                                  state.ext.motionplus.low_speed[CWIID_PSI]);
+ 
+ 			if (!PyExt) {
+ 				Py_DECREF(PyState);
+@@ -623,13 +590,13 @@ static PyVarObject *Wiimote_get_state(Wi
+ 	return PyState;
+ }
+ 
+-static PyVarObject *Wiimote_get_acc_cal(Wiimote *self, PyVarObject *args,
+-                                     PyVarObject *kwds)
++static PyObject *Wiimote_get_acc_cal(Wiimote *self, PyObject *args,
++                                     PyObject *kwds)
+ {
+ 	static char *kwlist[] = { "ext_type", NULL };
+ 	int ext_type;
+ 	struct acc_cal acc_cal;
+-	PyVarObject *PyAccCal;
++	PyObject *PyAccCal;
+ 
+ 	if (!self->wiimote) {
+ 		SET_CLOSED_ERROR;
+@@ -658,10 +625,10 @@ static PyVarObject *Wiimote_get_acc_cal(
+ 	return PyAccCal;
+ }
+ 
+-static PyVarObject *Wiimote_get_balance_cal(Wiimote *self)
++static PyObject *Wiimote_get_balance_cal(Wiimote *self)
+ {
+ 	struct balance_cal balance_cal;
+-	PyVarObject *PyBalCal;
++	PyObject *PyBalCal;
+ 
+ 	if (cwiid_get_balance_cal(self->wiimote, &balance_cal)) {
+ 		PyErr_SetString(PyExc_RuntimeError,
+@@ -688,7 +655,7 @@ static PyVarObject *Wiimote_get_balance_
+ 	return PyBalCal;
+ }
+ 
+-static PyVarObject *Wiimote_request_status(Wiimote *self)
++static PyObject *Wiimote_request_status(Wiimote *self)
+ {
+ 	if (!self->wiimote) {
+ 		SET_CLOSED_ERROR;
+@@ -703,7 +670,7 @@ static PyVarObject *Wiimote_request_stat
+ 	Py_RETURN_NONE;
+ }
+ 
+-static int Wiimote_set_led(Wiimote *self, PyVarObject *PyLed, void *closure)
++static int Wiimote_set_led(Wiimote *self, PyObject *PyLed, void *closure)
+ {
+ 	long led;
+ 
+@@ -712,7 +679,7 @@ static int Wiimote_set_led(Wiimote *self
+ 		return -1;
+ 	}
+ 
+-	if (((led = PyInt_AsLong(PyLed)) == -1) && PyErr_Occurred()) {
++	if (((led = PyLong_AsLong(PyLed)) == -1) && PyErr_Occurred()) {
+ 		return -1;
+ 	}
+ 
+@@ -726,7 +693,7 @@ static int Wiimote_set_led(Wiimote *self
+ }
+ 
+ static int
+-	Wiimote_set_rumble(Wiimote *self, PyVarObject *PyRumble, void *closure)
++	Wiimote_set_rumble(Wiimote *self, PyObject *PyRumble, void *closure)
+ {
+ 	long rumble;
+ 
+@@ -735,7 +702,7 @@ static int
+ 		return -1;
+ 	}
+ 
+-	if (((rumble = PyInt_AsLong(PyRumble)) == -1) && PyErr_Occurred()) {
++	if (((rumble = PyLong_AsLong(PyRumble)) == -1) && PyErr_Occurred()) {
+ 		return -1;
+ 	}
+ 
+@@ -749,7 +716,7 @@ static int
+ }
+ 
+ static int
+-	Wiimote_set_rpt_mode(Wiimote *self, PyVarObject *PyRptMode, void *closure)
++	Wiimote_set_rpt_mode(Wiimote *self, PyObject *PyRptMode, void *closure)
+ {
+ 	long rpt_mode;
+ 
+@@ -758,7 +725,7 @@ static int
+ 		return -1;
+ 	}
+ 
+-	if (((rpt_mode = PyInt_AsLong(PyRptMode)) == -1) && PyErr_Occurred()) {
++	if (((rpt_mode = PyLong_AsLong(PyRptMode)) == -1) && PyErr_Occurred()) {
+ 		return -1;
+ 	}
+ 
+@@ -771,7 +738,7 @@ static int
+ 	return 0;
+ }
+ 
+-/* static PyVarObject *Wiimote_command(Wiimote *self, PyVarObject *args, PyVarObject *kwds)
++/* static PyObject *Wiimote_command(Wiimote *self, PyObject *args, PyObject *kwds)
+ {
+ 	static char *kwlist[] = { "command", "flags", NULL };
+ 	int command, flags;
+@@ -787,7 +754,7 @@ static int
+ }
+ */
+ 
+-static PyVarObject *Wiimote_send_rpt(Wiimote *self, PyVarObject *args, PyVarObject *kwds)
++static PyObject *Wiimote_send_rpt(Wiimote *self, PyObject *args, PyObject *kwds)
+ {
+ 	static char *kwlist[] = { "flags", "report", "buffer", NULL };
+ 	unsigned char flags, report;
+@@ -812,14 +779,14 @@ static PyVarObject *Wiimote_send_rpt(Wii
+ 	Py_RETURN_NONE;
+ }
+ 
+-static PyVarObject *Wiimote_read(Wiimote *self, PyVarObject *args, PyVarObject *kwds)
++static PyObject *Wiimote_read(Wiimote *self, PyObject *args, PyObject *kwds)
+ {
+ 	static char *kwlist[] = { "flags", "offset", "len", NULL };
+ 	unsigned char flags;
+ 	unsigned int offset;
+ 	Py_ssize_t len;
+ 	void *buf;
+-	PyVarObject *pyRetBuf;
++	PyObject *pyRetBuf;
+ 
+ 	if (!self->wiimote) {
+ 		SET_CLOSED_ERROR;
+@@ -831,10 +798,10 @@ static PyVarObject *Wiimote_read(Wiimote
+ 		return NULL;
+ 	}
+ 
+-	if (!(pyRetBuf = PyBuffer_New(len))) {
++	if (!(pyRetBuf = malloc(len))) {
+ 		return NULL;
+ 	}
+-	if (PyVarObject_AsWriteBuffer(pyRetBuf, &buf, &len)) {
++	if (PyObject_AsWriteBuffer(pyRetBuf, &buf, &len)) {
+ 		Py_DECREF(pyRetBuf);
+ 		return NULL;
+ 	}
+@@ -847,7 +814,7 @@ static PyVarObject *Wiimote_read(Wiimote
+ 	return pyRetBuf;
+ }
+ 
+-static PyVarObject *Wiimote_write(Wiimote *self, PyVarObject *args, PyVarObject *kwds)
++static PyObject *Wiimote_write(Wiimote *self, PyObject *args, PyObject *kwds)
+ {
+ 	static char *kwlist[] = { "flags", "offset", "buffer", NULL };
+ 	unsigned char flags;
+@@ -876,8 +843,8 @@ static PyVarObject *Wiimote_write(Wiimot
+ static void CallbackBridge(cwiid_wiimote_t *wiimote, int mesg_count,
+ 	                       union cwiid_mesg mesg[], struct timespec *t)
+ {
+-	PyVarObject *ArgTuple;
+-	PyVarObject *PySelf;
++	PyObject *ArgTuple;
++	PyObject *PySelf;
+ 	PyGILState_STATE gstate;
+ 
+ 	gstate = PyGILState_Ensure();
+@@ -885,8 +852,8 @@ static void CallbackBridge(cwiid_wiimote
+ 	ArgTuple = ConvertMesgArray(mesg_count, mesg);
+ 
+ 	/* Put id and the list of messages as the arguments to the callback */
+-	PySelf = (PyVarObject *) cwiid_get_data(wiimote);
+-	if (!PyVarObject_CallFunction(((Wiimote *)PySelf)->callback, "(O, d)",
++	PySelf = (PyObject *) cwiid_get_data(wiimote);
++	if (!PyObject_CallFunction(((Wiimote *)PySelf)->callback, "(O, d)",
+ 	                           ArgTuple,
+ 	                           t->tv_sec + ((double) t->tv_nsec) * 1e-9)) {
+ 		PyErr_Print();
+@@ -918,15 +885,16 @@ static void CallbackBridge(cwiid_wiimote
+  *                               "right_bottom":right_bottom,
+  *                               "left_top":left_top,
+  *                               "left_bottom":left_bottom},
+- *          (cwiid.MOTIONPLUS_MESG,{"angle_rate":(psi,theta,phi)},
++ *          (cwiid.MOTIONPLUS_MESG,{"angle_rate":(psi,theta,phi),
++ *                                  "low_speed":(psi,theta,phi)},
+  *          (cwiid.ERROR_MESG,error)]
+  */
+-PyVarObject *ConvertMesgArray(int mesg_count, union cwiid_mesg mesg[])
++PyObject *ConvertMesgArray(int mesg_count, union cwiid_mesg mesg[])
+ {
+-	PyVarObject *mesglist; /* List of message tuples */
+-	PyVarObject *amesg; /* A single message (type, [arguments]) */
+-	PyVarObject *mesgVal; /* Dictionary of arguments for a message */
+-	PyVarObject *PyIrList;
++	PyObject *mesglist; /* List of message tuples */
++	PyObject *amesg; /* A single message (type, [arguments]) */
++	PyObject *mesgVal; /* Dictionary of arguments for a message */
++	PyObject *PyIrList;
+ 	int i, j;
+ 
+ 	if (!(mesglist = PyList_New(mesg_count))) {
+@@ -956,8 +924,8 @@ PyVarObject *ConvertMesgArray(int mesg_c
+ 			}
+ 
+ 			for (j=0; j < CWIID_IR_SRC_COUNT; j++) {
+-				PyVarObject *PyIrSrc;
+-				PyVarObject *PySize;
++				PyObject *PyIrSrc;
++				PyObject *PySize;
+ 
+ 				if (mesg[i].ir_mesg.src[j].valid) {
+ 					PyIrSrc = Py_BuildValue("{s:(I,I)}",
+@@ -972,7 +940,7 @@ PyVarObject *ConvertMesgArray(int mesg_c
+ 					}
+ 
+ 					if (mesg[i].ir_mesg.src[j].size != -1) {
+-						if (!(PySize = PyInt_FromLong(
++						if (!(PySize = PyLong_FromLong(
+ 						  (long)mesg[i].ir_mesg.src[j].size))) {
+ 							Py_DECREF(PyIrList);
+ 							Py_DECREF(PyIrSrc);
+@@ -1037,11 +1005,16 @@ PyVarObject *ConvertMesgArray(int mesg_c
+ 			               mesg[i].balance_mesg.left_bottom);
+ 			break;
+ 		case CWIID_MESG_MOTIONPLUS:
+-			mesgVal = Py_BuildValue("{s:(I,I,I)}",
++			mesgVal = Py_BuildValue("{s:(I,I,I),s:(I,I,I)}",
+ 			                        "angle_rate",
+-			                          mesg[i].motionplus_mesg.angle_rate[CWIID_PHI],
+-			                          mesg[i].motionplus_mesg.angle_rate[CWIID_THETA],
+-			                          mesg[i].motionplus_mesg.angle_rate[CWIID_PSI]);
++                                    mesg[i].motionplus_mesg.angle_rate[CWIID_PHI],
++                                    mesg[i].motionplus_mesg.angle_rate[CWIID_THETA],
++                                    mesg[i].motionplus_mesg.angle_rate[CWIID_PSI],
++                                    "low_speed",
++                                    mesg[i].motionplus_mesg.low_speed[CWIID_PHI],
++                                    mesg[i].motionplus_mesg.low_speed[CWIID_THETA],
++                                    mesg[i].motionplus_mesg.low_speed[CWIID_PSI]);
++                                    
+ 			break;
+ 		case CWIID_MESG_ERROR:
+ 			mesgVal = Py_BuildValue("i", mesg[i].error_mesg.error);
+Index: cwiid/python/cwiidmodule.c
+===================================================================
+--- cwiid.orig/python/cwiidmodule.c
++++ cwiid/python/cwiidmodule.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2007 Justin M. Tulloss <jmtulloss@gmail.com>
++ * Copyright (C) 2007 Justin M. Tulloss <jmtulloss@gmail.com>, L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  * Interface from Python to libcwiid
+  *
+@@ -18,67 +18,21 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, 
+  * Boston, MA  02110-1301  USA
+  *
+- * ChangeLog:
+- * 2007-06-05 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * removed Wiimote_FromC function
+- *
+- * 2007-06-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * added CObjects for Wiimote_FromC and ConvertMesgArray
+- *
+- * 2007-05-22 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * clarified variable names
+- *
+- * 2007-05-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * moved Wiimote class to separate files
+- *
+- * 2007-05-12 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * added keywords to read
+- * * finished get_mesg
+- * * cleaned up types in get_state
+- * * finished processMesgs
+- *
+- * 2007-05-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * finished get_state
+- * * fixed read buffer issue
+- * * implemented write
+- * * cleaned up types
+- * * removed notImplemented (no longer needed)
+- *
+- * 2007-05-07 L. Donnie Smith <cwiid@abstrakraft.org>
+- * * C-style comments
+- * * changed struct name to Wiimote
+- * * removed dlopen, unused includes
+- * * spaces to tabs, misc stylistic changes to match CWiid code
+- * * changed self types to Wiimote
+- * * made bdaddr local
+- * * improved error checking in Wiimote_init
+- * * implemented disconnect, enable, disable
+- * * partially implemented get_state
+- *
+- * 2007-05-07 Justin M. Tulloss <jmtulloss@gmail.com>
+- * * Refactored according to dsmith's wishes, removed unnecessary locks
+- * * implemented read
+- *
+- * 2007-04-26 Justin M. Tulloss <jmtulloss@gmail.com>
+- * * Updated for new libcwiid API
+- *
+- * 2007-04-24 Justin M. Tulloss <jmtulloss@gmail.com>
+- * * Initial Changelog
+  */
+ 
+ #include "Python.h"
+ 
+ #include <stdlib.h>
+ 
+-#include "cwiid.h"
++#include <cwiid.h>
+ #include "structmember.h"
+ 
+ /* externally defined types */
+ extern PyTypeObject Wiimote_Type;
+-extern PyVarObject *ConvertMesgArray(int, union cwiid_mesg []);
++extern PyObject *ConvertMesgArray(int, union cwiid_mesg []);
+ 
+ /* cwiid module initializer */
+-PyMODINIT_FUNC init_cwiid(void);
++PyMODINIT_FUNC PyInit_cwiid(void);
+ 
+ /* constants, enumerations */
+ #define CWIID_CONST_MACRO(a) {#a, CWIID_##a}
+@@ -182,47 +136,46 @@ static PyMethodDef Module_Methods[] =
+ };
+ 
+ static struct PyModuleDef moduledef = {
+-  PyModuleDef_HEAD_INIT,
+-  "cwiid",     /* m_name */
+-  "CWiid Wiimote Interface",  /* m_doc */
+-  -1,                  /* m_size */
+-  Module_Methods,    /* m_methods */
+-  NULL,                /* m_reload */
+-  NULL,                /* m_traverse */
+-  NULL,                /* m_clear */
+-  NULL,                /* m_free */
++	PyModuleDef_HEAD_INIT,
++	"cwiid",        /* m_name */
++	"Cwiid FFS!",   /* m_doc */
++	-1,             /* m_size */
++	Module_Methods, /* m_methods */
++	NULL,           /* m_reload */
++	NULL,           /* m_traverse */
++	NULL,           /* m_clear */
++	NULL,           /* m_free */
+ };
+ 
+-
+-PyMODINIT_FUNC init_cwiid(void)
++PyMODINIT_FUNC PyInit_cwiid(void)
+ {
+-	PyVarObject *Module;
+-	PyVarObject *CObj;
++	PyObject *Module;
++	PyObject *CCapsule;
+ 	int i;
+ 
+-	PyEval_InitThreads();
+-
+-	if (PyType_Ready(&Wiimote_Type) < 0) {
+-		return;
++	if (!(Module = PyModule_Create(&moduledef))) {
++		return NULL;
+ 	}
+ 
+-	if (!(Module = PyModule_Create(&moduledef))) {
+-		return;
++	Wiimote_Type.tp_new = PyType_GenericNew;
++	if (PyType_Ready(&Wiimote_Type) < 0) {
++		return NULL;
+ 	}
+ 
+ 	Py_INCREF(&Wiimote_Type);
+-	PyModule_AddObject(Module, "Wiimote", (PyVarObject*)&Wiimote_Type);
++	PyModule_AddObject(Module, "Wiimote", (PyObject *)&Wiimote_Type);
+ 
+ 	for (i = 0; cwiid_constants[i].name; i++) {
+ 		/* No way to report errors from here, so just ignore them and hope
+ 		 * for segfault */
+ 		PyModule_AddIntConstant(Module, cwiid_constants[i].name,
+-		                        cwiid_constants[i].value);
++								cwiid_constants[i].value);
+ 	}
+ 
+-	if (!(CObj = PyCObject_FromVoidPtr(ConvertMesgArray, NULL))) {
+-		return;
++	if (!(CCapsule = PyCapsule_New(ConvertMesgArray, "dynamr", NULL))) {
++		return NULL;
+ 	}
+-	PyModule_AddObject(Module, "ConvertMesgArray", CObj);
++	PyModule_AddObject(Module, "ConvertMesgArray", CCapsule);
++	
++	return Module;
+ }
+-
+Index: cwiid/python/setup.py
+===================================================================
+--- cwiid.orig/python/setup.py
++++ cwiid/python/setup.py
+@@ -1,16 +1,10 @@
+ from distutils.core import setup, Extension
+-from subprocess import PIPE, Popen
+-import os, re
+ 
+-changelogFile = os.path.join(os.path.dirname(__file__), "..", "debian", "changelog")
+-p=Popen(f"dpkg-parsechangelog -l {changelogFile} | grep Version",
+-        shell=True, stdout=PIPE)
+-out, err = p.communicate()
+-version = out.decode("utf-8").strip()
+-m = re.match(r"^[^0-9]*([.0-9]*).*$",version, re.M)
+-version = m.group(1)
+-
+-setup(name='cwiid',
+-	version=version,
+-	ext_modules=[Extension('cwiid', ['cwiidmodule.c', 'Wiimote.c'])]
+-	)
++setup(
++    name='cwiid',
++    version='3.0.0',
++    description='Python3 module for libcwiid',
++    author='Azzra',
++    author_email='azzra@users.noreply.github.com',
++    ext_modules=[Extension('cwiid', ['cwiidmodule.c', 'Wiimote.c'], libraries=['cwiid', 'bluetooth'])]
++)
+Index: cwiid/libcwiid/bluetooth.c
+===================================================================
+--- cwiid.orig/libcwiid/bluetooth.c
++++ cwiid/libcwiid/bluetooth.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,27 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-04-24 L. Donnie Smith (cwiid@abstrakraft.org>
+- *  * revised error messages
+- *
+- *  2007-04-12 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * streamlined wiimote filter
+- *
+- *  2007-04-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * renamed wiimote to libcwiid, renamed structures accordingly
+- *
+- *  2007-04-07 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * changed cwiid_info.class to btclass
+- *
+- *  2007-04-03 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * fixed cwiid_find_wiimote seg fault
+- *
+- *  2007-04-02 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * exception handling bugs
+- *
+- *  2007-04-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * created file
+  */
+ 
+ #include <stdlib.h>
+Index: cwiid/libcwiid/command.c
+===================================================================
+--- cwiid.orig/libcwiid/command.c
++++ cwiid/libcwiid/command.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,32 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-05-16 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added cwiid_request_status, cwiid_set_let, cwiid_set_rumble,
+- *    cwiid_set_rpt_mode
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * rewrite for API overhaul
+- *  * added rw and beep functions from rw.c
+- *
+- *  2007-04-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * renamed wiimote to libcwiid, renamed structures accordingly
+- *
+- *  2007-04-04 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * updated cwiid_read and cwiid_write to trigger and detect rw_error
+- *
+- *  2007-03-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * audited error checking (coda and error handler sections)
+- *  * updated comments
+- *  * cwiid_read - changed to obey decode flag only for register read
+- *
+- *  2007-03-06 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added wiimote parameter to cwiid_err calls
+- *
+- *  2007-03-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * Initial ChangeLog
+- *  * type audit (stdint, const, char booleans)
+  */
+ 
+ #include <stdint.h>
+Index: cwiid/libcwiid/connect.c
+===================================================================
+--- cwiid.orig/libcwiid/connect.c
++++ cwiid/libcwiid/connect.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,40 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2009-06-13 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * add cwiid_open_timeout function, call it with default from cwiid_open
+- *
+- *  2007-06-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added sleep after cwiid_find_wiimote call
+- *
+- *  2007-05-16 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * remove error_pipe init and destruct
+- *  * renamed connect and disconnect to open and close
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * rewrite for API overhaul
+- *
+- *  2007-04-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * renamed wiimote to libcwiid, renamed structures accordingly
+- *
+- *  2007-04-04 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * cancel rw operations from cwiid_disconnect
+- *
+- *  2007-04-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * cwiid_connect now takes a pointer to bdaddr_t
+- *  * changed cwiid_findfirst to cwiid_find_wiimote
+- *
+- *  2007-03-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * changed memcpy to bacmp
+- *  * audited error checking (coda and error handler sections)
+- *  * updated comments
+- *
+- *  2007-03-06 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added wiimote parameter to cwiid_err calls
+- *
+- *  2007-03-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * Initial ChangeLog
+  */
+ 
+ #include <stdlib.h>
+@@ -67,41 +33,14 @@ static int wiimote_id = 0;
+ /* TODO: Turn this onto a macro on next major so version */
+ cwiid_wiimote_t *cwiid_open(bdaddr_t *bdaddr, int flags)
+ {
+-	return cwiid_open_timeout(bdaddr, flags, 5);
++	return cwiid_open_timeout(bdaddr, flags, DEFAULT_TIMEOUT);
+ }
+ 
+ cwiid_wiimote_t *cwiid_open_timeout(bdaddr_t *bdaddr, int flags, int timeout)
+ {
+-	struct wiimote *wiimote = NULL;
+ 	struct sockaddr_l2 remote_addr;
+-	char mesg_pipe_init = 0, status_pipe_init = 0, rw_pipe_init = 0,
+-	     state_mutex_init = 0, rw_mutex_init = 0, rpt_mutex_init = 0,
+-	     router_thread_init = 0, status_thread_init = 0;
+-	void *pthread_ret;
+-
+-	/* Allocate wiimote */
+-	if ((wiimote = malloc(sizeof *wiimote)) == NULL) {
+-		cwiid_err(NULL, "Memory allocation error (cwiid_wiimote_t)");
+-		goto ERR_HND;
+-	}
+-
+-	/* set flags */
+-	wiimote->flags = flags;
+-
+-	/* For error detection */
+-	wiimote->ctl_socket = wiimote->int_socket = -1;
+-
+-	/* Global Lock, Store and Increment wiimote_id */
+-	if (pthread_mutex_lock(&global_mutex)) {
+-		cwiid_err(NULL, "Mutex lock error (global mutex)");
+-		goto ERR_HND;
+-	}
+-	wiimote->id = wiimote_id++;
+-	if (pthread_mutex_unlock(&global_mutex)) {
+-		cwiid_err(wiimote, "Mutex unlock error (global mutex) - "
+-		                   "deadlock warning");
+-		goto ERR_HND;
+-	}
++	int ctl_socket = -1, int_socket = -1;
++	struct wiimote *wiimote = NULL;
+ 
+ 	/* If BDADDR_ANY is given, find available wiimote */
+ 	if (bacmp(bdaddr, BDADDR_ANY) == 0) {
+@@ -117,27 +56,178 @@ cwiid_wiimote_t *cwiid_open_timeout(bdad
+ 	remote_addr.l2_family = AF_BLUETOOTH;
+ 	remote_addr.l2_bdaddr = *bdaddr;
+ 	remote_addr.l2_psm = htobs(CTL_PSM);
+-	if ((wiimote->ctl_socket =
++	if ((ctl_socket =
+ 	  socket(AF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP)) == -1) {
+-		cwiid_err(wiimote, "Socket creation error (control socket)");
++		cwiid_err(NULL, "Socket creation error (control socket)");
+ 		goto ERR_HND;
+ 	}
+-	if (connect(wiimote->ctl_socket, (struct sockaddr *)&remote_addr,
++	if (connect(ctl_socket, (struct sockaddr *)&remote_addr,
+ 		        sizeof remote_addr)) {
+-		cwiid_err(wiimote, "Socket connect error (control channel)");
++		cwiid_err(NULL, "Socket connect error (control socket)");
+ 		goto ERR_HND;
+ 	}
+ 
+ 	/* Interrupt Channel */
+ 	remote_addr.l2_psm = htobs(INT_PSM);
+-	if ((wiimote->int_socket =
++	if ((int_socket =
+ 	  socket(AF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP)) == -1) {
+-		cwiid_err(wiimote, "Socket creation error (interrupt socket)");
++		cwiid_err(NULL, "Socket creation error (interrupt socket)");
+ 		goto ERR_HND;
+ 	}
+-	if (connect(wiimote->int_socket, (struct sockaddr *)&remote_addr,
++	if (connect(int_socket, (struct sockaddr *)&remote_addr,
+ 		        sizeof remote_addr)) {
+-		cwiid_err(wiimote, "Socket connect error (interrupt channel)");
++		cwiid_err(NULL, "Socket connect error (interrupt socket)");
++		goto ERR_HND;
++	}
++
++	if ((wiimote = cwiid_new(ctl_socket, int_socket, flags)) == NULL) {
++		/* Raises its own error */
++		goto ERR_HND;
++	}
++
++	return wiimote;
++
++ERR_HND:
++	/* Close Sockets */
++	if (ctl_socket != -1) {
++		if (close(ctl_socket)) {
++			cwiid_err(NULL, "Socket close error (control socket)");
++		}
++	}
++	if (int_socket != -1) {
++		if (close(int_socket)) {
++			cwiid_err(NULL, "Socket close error (interrupt socket)");
++		}
++	}
++	return NULL;
++}
++
++cwiid_wiimote_t *cwiid_listen(int flags)
++{
++	struct sockaddr_l2 local_addr;
++	struct sockaddr_l2 remote_addr;
++	socklen_t socklen;
++	int ctl_server_socket = -1, int_server_socket = -1,
++	    ctl_socket = -1, int_socket = -1;
++	struct wiimote *wiimote = NULL;
++
++	/* Connect to Wiimote */
++	/* Control Channel */
++	memset(&local_addr, 0, sizeof local_addr);
++	local_addr.l2_family = AF_BLUETOOTH;
++	local_addr.l2_bdaddr = *BDADDR_ANY;
++	local_addr.l2_psm = htobs(CTL_PSM);
++	if ((ctl_server_socket =
++	  socket(AF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP)) == -1) {
++		cwiid_err(NULL, "Socket creation error (control socket)");
++		goto ERR_HND;
++	}
++	if (bind(ctl_server_socket, (struct sockaddr *)&local_addr,
++	         sizeof local_addr)) {
++		cwiid_err(NULL, "Socket bind error (control socket)");
++		goto ERR_HND;
++	}
++	if (listen(ctl_server_socket, 1)) {
++		cwiid_err(NULL, "Socket listen error (control socket)");
++		goto ERR_HND;
++	}
++
++	/* Interrupt Channel */
++	local_addr.l2_psm = htobs(INT_PSM);
++	if ((int_server_socket =
++	  socket(AF_BLUETOOTH, SOCK_SEQPACKET, BTPROTO_L2CAP)) == -1) {
++		cwiid_err(NULL, "Socket creation error (interrupt socket)");
++		goto ERR_HND;
++	}
++	if (bind(int_server_socket, (struct sockaddr *)&local_addr,
++	         sizeof local_addr)) {
++		cwiid_err(NULL, "Socket bind error (interrupt socket)");
++		goto ERR_HND;
++	}
++	if (listen(int_server_socket, 1)) {
++		cwiid_err(NULL, "Socket listen error (interrupt socket)");
++		goto ERR_HND;
++	}
++
++	/* Block for Connections */
++	if ((ctl_socket = accept(ctl_server_socket, (struct sockaddr *)&remote_addr, &socklen)) < 0) {
++		cwiid_err(NULL, "Socket accept error (control socket)");
++		goto ERR_HND;
++	}
++	if ((int_socket = accept(int_server_socket, (struct sockaddr *)&remote_addr, &socklen)) < 0) {
++		cwiid_err(NULL, "Socket accept error (interrupt socket)");
++		goto ERR_HND;
++	}
++
++	/* Close server sockets */
++	if (close(ctl_server_socket)) {
++		cwiid_err(NULL, "Socket close error (control socket)");
++	}
++	if (close(int_server_socket)) {
++		cwiid_err(NULL, "Socket close error (interrupt socket)");
++	}
++
++	if ((wiimote = cwiid_new(ctl_socket, int_socket, flags)) == NULL) {
++		/* Raises its own error */
++		goto ERR_HND;
++	}
++
++	return wiimote;
++
++ERR_HND:
++	/* Close Sockets */
++	if (ctl_server_socket != -1) {
++		if (close(ctl_server_socket)) {
++			cwiid_err(NULL, "Socket close error (control server socket)");
++		}
++	}
++	if (int_server_socket != -1) {
++		if (close(int_server_socket)) {
++			cwiid_err(NULL, "Socket close error (interrupt server socket)");
++		}
++	}
++	if (ctl_socket != -1) {
++		if (close(ctl_socket)) {
++			cwiid_err(NULL, "Socket close error (control socket)");
++		}
++	}
++	if (int_socket != -1) {
++		if (close(int_socket)) {
++			cwiid_err(NULL, "Socket close error (interrupt socket)");
++		}
++	}
++
++	return NULL;
++}
++
++cwiid_wiimote_t *cwiid_new(int ctl_socket, int int_socket, int flags)
++{
++	struct wiimote *wiimote = NULL;
++	char mesg_pipe_init = 0, status_pipe_init = 0, rw_pipe_init = 0,
++	     state_mutex_init = 0, rw_mutex_init = 0, rpt_mutex_init = 0,
++	     router_thread_init = 0, status_thread_init = 0;
++	void *pthread_ret;
++
++	/* Allocate wiimote */
++	if ((wiimote = malloc(sizeof *wiimote)) == NULL) {
++		cwiid_err(NULL, "Memory allocation error (cwiid_wiimote_t)");
++		goto ERR_HND;
++	}
++
++	/* set sockets and flags */
++	wiimote->ctl_socket = ctl_socket;
++	wiimote->int_socket = int_socket;
++	wiimote->flags = flags;
++
++	/* Global Lock, Store and Increment wiimote_id */
++	if (pthread_mutex_lock(&global_mutex)) {
++		cwiid_err(NULL, "Mutex lock error (global mutex)");
++		goto ERR_HND;
++	}
++	wiimote->id = wiimote_id++;
++	if (pthread_mutex_unlock(&global_mutex)) {
++		cwiid_err(wiimote, "Mutex unlock error (global mutex) - "
++		                   "deadlock warning");
+ 		goto ERR_HND;
+ 	}
+ 
+@@ -190,7 +280,7 @@ cwiid_wiimote_t *cwiid_open_timeout(bdad
+ 	/* Set rw_status before starting router thread */
+ 	wiimote->rw_status = RW_IDLE;
+ 
+-	/* Launch interrupt channel listener and dispatch threads */
++	/* Launch interrupt socket listener and dispatch threads */
+ 	if (pthread_create(&wiimote->router_thread, NULL,
+ 	                   (void *(*)(void *))&router_thread, wiimote)) {
+ 		cwiid_err(wiimote, "Thread creation error (router thread)");
+@@ -236,17 +326,6 @@ ERR_HND:
+ 			}
+ 		}
+ 
+-		/* Close Sockets */
+-		if (wiimote->int_socket != -1) {
+-			if (close(wiimote->int_socket)) {
+-				cwiid_err(wiimote, "Socket close error (interrupt channel)");
+-			}
+-		}
+-		if (wiimote->ctl_socket != -1) {
+-			if (close(wiimote->ctl_socket)) {
+-				cwiid_err(wiimote, "Socket close error (control channel)");
+-			}
+-		}
+ 		/* Close Pipes */
+ 		if (mesg_pipe_init) {
+ 			if (close(wiimote->mesg_pipe[0]) || close(wiimote->mesg_pipe[1])) {
+@@ -289,6 +368,14 @@ int cwiid_close(cwiid_wiimote_t *wiimote
+ {
+ 	void *pthread_ret;
+ 
++	/* Stop rumbling, otherwise wiimote continues to rumble for
++	   few seconds after closing the connection! There should be no
++	   need to check if stopping fails: we are closing the connection
++	   in any case. */
++	if (wiimote->state.rumble) {
++		cwiid_set_rumble(wiimote, 0);
++	}
++
+ 	/* Cancel and join router_thread and status_thread */
+ 	if (pthread_cancel(wiimote->router_thread)) {
+ 		/* if thread quit abnormally, would have printed it's own error */
+@@ -322,10 +409,10 @@ int cwiid_close(cwiid_wiimote_t *wiimote
+ 
+ 	/* Close sockets */
+ 	if (close(wiimote->int_socket)) {
+-		cwiid_err(wiimote, "Socket close error (interrupt channel)");
++		cwiid_err(wiimote, "Socket close error (interrupt socket)");
+ 	}
+ 	if (close(wiimote->ctl_socket)) {
+-		cwiid_err(wiimote, "Socket close error (control channel)");
++		cwiid_err(wiimote, "Socket close error (control socket)");
+ 	}
+ 	/* Close Pipes */
+ 	if (close(wiimote->mesg_pipe[0]) || close(wiimote->mesg_pipe[1])) {
+Index: cwiid/libcwiid/cwiid.h
+===================================================================
+--- cwiid.orig/libcwiid/cwiid.h
++++ cwiid/libcwiid/cwiid.h
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,44 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-08-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * make cwiid_err_default public
+- *
+- *  2007-05-16 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * changed cwiid_connect, cwiid_disconnect to cwiid_open, cwiid_close
+- *  * added cwiid_request_status, cwiid_set_let, cwiid_set_rumble,
+- *    cwiid_set_rpt_mode
+- *
+- *  2007-05-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added timestamp to message functions
+- *  * added cwiid_get_acc_cal
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * rewrite for API overhaul
+- *
+- *  2007-04-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * renamed wiimote to libcwiid, renamed structures accordingly
+- *
+- *  2007-04-07 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * changed cwiid_info.class to btclass
+- *
+- *  2007-04-04 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added cwiid_mesg_error message type
+- *
+- *  2007-04-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * cwiid_connect now takes a pointer to bdaddr_t
+- *  * added cwiid_info definition and macros
+- *  * added cwiid_get_info_array prototype
+- *  * changed cwiid_findfirst to cwiid_find_wiimote
+- *
+- *  2007-03-05 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added cwiid_err_t definition
+- *  * added cwiid_set_err prototype
+- *
+- *  2007-03-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * Initial ChangeLog
+- *  * type audit (stdint, const, char booleans)
+  */
+ 
+ #ifndef CWIID_H
+@@ -263,6 +225,7 @@ struct cwiid_balance_mesg {
+ struct cwiid_motionplus_mesg {
+ 	enum cwiid_mesg_type type;
+ 	uint16_t angle_rate[3];
++	uint8_t low_speed[3];
+ };
+ 
+ struct cwiid_error_mesg {
+@@ -307,6 +270,7 @@ struct balance_state {
+ 
+ struct motionplus_state {
+ 	uint16_t angle_rate[3];
++	uint8_t low_speed[3];
+ };
+ 
+ union ext_state {
+@@ -359,6 +323,7 @@ void cwiid_err_default(struct wiimote *w
+ #define cwiid_disconnect cwiid_close
+ cwiid_wiimote_t *cwiid_open(bdaddr_t *bdaddr, int flags);
+ cwiid_wiimote_t *cwiid_open_timeout(bdaddr_t *bdaddr, int flags, int timeout);
++cwiid_wiimote_t *cwiid_listen(int flags);
+ int cwiid_close(cwiid_wiimote_t *wiimote);
+ 
+ int cwiid_get_id(cwiid_wiimote_t *wiimote);
+Index: cwiid/libcwiid/cwiid.pc.in
+===================================================================
+--- cwiid.orig/libcwiid/cwiid.pc.in
++++ cwiid/libcwiid/cwiid.pc.in
+@@ -3,8 +3,6 @@ exec_prefix=@exec_prefix@
+ libdir=@libdir@
+ includedir=@includedir@
+ sysconfdir=@sysconfdir@
+-cwiid_config_dir=${sysconfdir}/cwiid
+-cwiid_plugins_dir=@CWIID_PLUGINS_DIR@
+ 
+ Name: CWiid
+ Description: CWiid Wiimote Interface
+Index: cwiid/libcwiid/cwiid_internal.h
+===================================================================
+--- cwiid.orig/libcwiid/cwiid_internal.h
++++ cwiid/libcwiid/cwiid_internal.h
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,32 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-05-16 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * remove error_pipe
+- *  * add struct mesg_array to process_error
+- *
+- *  2007-05-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added timestamp to mesg_array
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * rewrite for API overhaul
+- *
+- *  2007-04-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * renamed wiimote to libcwiid, renamed structures accordingly
+- *
+- *  2007-04-04 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * moved RW error state to separate member
+- *
+- *  2007-04-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * removed CWIID_CMP_LEN macro and cwiid_findfirst prototype
+- *
+- *  2007-03-05 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added wiimote parameter to cwiid_err prototype
+- *
+- *  2007-03-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * Initial ChangeLog
+- *  * type audit (stdint, const, char booleans)
+  */
+ 
+ #ifndef CWIID_INTERNAL_H
+@@ -50,6 +24,8 @@
+ #include <sys/types.h>	/* ssize_t */
+ #include "cwiid.h"
+ 
++#define DEFAULT_TIMEOUT	5
++
+ /* Bluetooth magic numbers */
+ #define BT_TRANS_MASK		0xF0
+ #define BT_TRANS_HANDSHAKE	0x00
+@@ -114,18 +90,30 @@
+ #define NUNCHUK_BTN_MASK	0x03
+ 
+ /* Extension Values */
+-#define EXT_NONE		0x2E
+-#define EXT_PARTIAL		0xFF
+-#define EXT_NUNCHUK		0x00
+-#define EXT_CLASSIC		0x01
+-#define EXT_BALANCE		0x2A
+-#define EXT_MOTIONPLUS	0x04
++#define EXT_NONE		0x2E2E
++#define EXT_PARTIAL		0xFFFF
++#define EXT_NUNCHUK		0x0000
++#define EXT_CLASSIC		0x0101
++#define EXT_BALANCE		0x0402
++#define EXT_MOTIONPLUS	0x0405
+ 
+ /* IR Enable blocks */
+-#define MARCAN_IR_BLOCK_1	"\x00\x00\x00\x00\x00\x00\x90\x00\xC0"
+-#define MARCAN_IR_BLOCK_2	"\x40\x00"
+-#define CLIFF_IR_BLOCK_1	"\x02\x00\x00\x71\x01\x00\xAA\x00\x64"
+-#define CLIFF_IR_BLOCK_2	"\x63\x03"
++#define MARCAN_IR_BLOCK_1			"\x00\x00\x00\x00\x00\x00\x90\x00\xC0"
++#define MARCAN_IR_BLOCK_2			"\x40\x00"
++#define CLIFF_IR_BLOCK_1			"\x02\x00\x00\x71\x01\x00\xAA\x00\x64"
++#define CLIFF_IR_BLOCK_2			"\x63\x03"
++#define MAX_SENSITIVITY_IR_BLOCK_1	"\x00\x00\x00\x00\x00\x00\x90\x00\x41"
++#define MAX_SENSITIVITY_IR_BLOCK_2	"\x40\x00"
++#define WII_L1_IR_BLOCK_1			"\x02\x00\x00\x71\x01\x00\x64\x00\xFE"
++#define WII_L1_IR_BLOCK_2			"\xFD\x05"
++#define WII_L2_IR_BLOCK_1			"\x02\x00\x00\x71\x01\x00\x96\x00\xB4"
++#define WII_L2_IR_BLOCK_2			"\xB3\x04"
++#define WII_L3_IR_BLOCK_1			"\x02\x00\x00\x71\x01\x00\xAA\x00\x64"
++#define WII_L3_IR_BLOCK_2			"\x63\x03"
++#define WII_L4_IR_BLOCK_1			"\x02\x00\x00\x71\x01\x00\xC8\x00\x36"
++#define WII_L4_IR_BLOCK_2			"\x35\x03"
++#define WII_L5_IR_BLOCK_1			"\x02\x00\x00\x71\x01\x00\x72\x00\x20"
++#define WII_L5_IR_BLOCK_2			"\x1F\x03"
+ 
+ /* Write Sequences */
+ enum write_seq_type {
+@@ -188,6 +176,8 @@ struct wiimote {
+ };
+ 
+ /* prototypes */
++cwiid_wiimote_t *cwiid_new(int ctl_socket, int int_socket, int flags);
++
+ /* thread.c */
+ void *router_thread(struct wiimote *wiimote);
+ void *status_thread(struct wiimote *wiimote);
+Index: cwiid/libcwiid/interface.c
+===================================================================
+--- cwiid.orig/libcwiid/interface.c
++++ cwiid/libcwiid/interface.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,13 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-05-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added timestamp to cwiid_get_mesg
+- *  * added cwiid_get_acc_cal
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * created for API overhaul
+  */
+ 
+ #include <errno.h>
+Index: cwiid/libcwiid/process.c
+===================================================================
+--- cwiid.orig/libcwiid/process.c
++++ cwiid/libcwiid/process.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,12 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-05-16 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * process_err adds error_mesg to mesg_array
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * created for API overhaul (moved from old event.c)
+  */
+ 
+ #include <unistd.h>
+@@ -239,6 +233,7 @@ int process_ext(struct wiimote *wiimote,
+ 			balance_mesg->left_bottom = ((uint16_t)data[6]<<8 |
+ 			                             (uint16_t)data[7]);
+ 		}
++		break;
+ 	case CWIID_EXT_MOTIONPLUS:
+ 		if (wiimote->state.rpt_mode & CWIID_RPT_MOTIONPLUS) {
+ 			motionplus_mesg = &ma->array[ma->count++].motionplus_mesg;
+@@ -249,6 +244,9 @@ int process_ext(struct wiimote *wiimote,
+ 			                                            (uint16_t)data[1];
+ 			motionplus_mesg->angle_rate[CWIID_PSI]   = ((uint16_t)data[3] & 0xFC)<<6 |
+ 			                                            (uint16_t)data[0];
++			motionplus_mesg->low_speed[CWIID_PHI]    = ((uint8_t)data[3] & 0x01);
++			motionplus_mesg->low_speed[CWIID_THETA]  = ((uint8_t)data[4] & 0x02)>>1;
++			motionplus_mesg->low_speed[CWIID_PSI]    = ((uint8_t)data[3] & 0x02)>>1;
+ 		}
+ 		break;
+ 	}
+Index: cwiid/libcwiid/state.c
+===================================================================
+--- cwiid.orig/libcwiid/state.c
++++ cwiid/libcwiid/state.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,9 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * created for API overhaul (update_rpt_mode moved from command.c)
+  */
+ 
+ #include <string.h>
+@@ -85,6 +82,9 @@ int update_state(struct wiimote *wiimote
+ 			memcpy(wiimote->state.ext.motionplus.angle_rate,
+ 			       mesg->motionplus_mesg.angle_rate,
+ 			       sizeof wiimote->state.ext.motionplus.angle_rate);
++			memcpy(wiimote->state.ext.motionplus.low_speed,
++			       mesg->motionplus_mesg.low_speed,
++			       sizeof wiimote->state.ext.motionplus.low_speed);
+ 			break;
+ 		case CWIID_MESG_ERROR:
+ 			wiimote->state.error = mesg->error_mesg.error;
+@@ -105,8 +105,8 @@ int update_state(struct wiimote *wiimote
+ }
+ 
+ /* IR Sensitivity Block */
+-unsigned char ir_block1[] = CLIFF_IR_BLOCK_1;
+-unsigned char ir_block2[] = CLIFF_IR_BLOCK_2;
++unsigned char ir_block1[] = MAX_SENSITIVITY_IR_BLOCK_1;
++unsigned char ir_block2[] = MAX_SENSITIVITY_IR_BLOCK_2;
+ 
+ struct write_seq ir_enable10_seq[] = {
+ 	{WRITE_SEQ_RPT, RPT_IR_ENABLE1, (const void *)"\x04", 1, 0},
+Index: cwiid/libcwiid/thread.c
+===================================================================
+--- cwiid.orig/libcwiid/thread.c
++++ cwiid/libcwiid/thread.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,41 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2007-05-16 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * send error_mesg from process_error
+- *
+- *  2007-05-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added timestamp to message array
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * rewrite for API overhaul (renamed from event.c)
+- *
+- *  2007-04-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * renamed wiimote to libcwiid, renamed structures accordingly
+- *
+- *  2007-04-08 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * fixed incompatible pointer warning in process_error
+- *
+- *  2007-04-08 Petter Reinholdtsen <pere@hungry.com>
+- *  * fixed signed/unsigned comparison error in int_listen
+- *
+- *  2007-04-04 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * implemented process_error to handle socket read errors
+- *  * added rw_status triggers to read and write handlers
+- *
+- *  2007-03-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * audit error checking
+- *  * reorganized file
+- *  * moved int_listen read/write code to process_read and process_write
+- *  * updated (some/a few) comments
+- *
+- *  2007-03-06 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * added wiimote parameter to cwiid_err calls
+- *
+- *  2007-03-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * Initial ChangeLog
+- *  * type audit (stdint, const, char booleans)
+  */
+ 
+ #include <stdint.h>
+@@ -196,13 +161,13 @@ void *status_thread(struct wiimote *wiim
+ 
+ 		if (status_mesg->ext_type == CWIID_EXT_UNKNOWN) {
+ 			/* Read extension ID */
+-			if (cwiid_read(wiimote, CWIID_RW_REG, 0xA400FE, 1, &buf[0])) {
++			if (cwiid_read(wiimote, CWIID_RW_REG, 0xA400FE, 2, &buf)) {
+ 				cwiid_err(wiimote, "Read error (extension error)");
+ 				status_mesg->ext_type = CWIID_EXT_UNKNOWN;
+ 			}
+ 			/* If the extension didn't change, or if the extension is a
+ 			 * MotionPlus, no init necessary */
+-			switch (buf[0]) {
++			switch ((buf[0] << 8) | buf[1]) {
+ 			case EXT_NONE:
+ 				status_mesg->ext_type = CWIID_EXT_NONE;
+ 				break;
+@@ -232,12 +197,12 @@ void *status_thread(struct wiimote *wiim
+ 						status_mesg->ext_type = CWIID_EXT_UNKNOWN;
+ 				}
+ 				/* Read extension ID */
+-				else if (cwiid_read(wiimote, CWIID_RW_REG, 0xA400FE, 1, &buf[0])) {
++				else if (cwiid_read(wiimote, CWIID_RW_REG, 0xA400FE, 2, &buf)) {
+ 					cwiid_err(wiimote, "Read error (extension error)");
+ 					status_mesg->ext_type = CWIID_EXT_UNKNOWN;
+ 				}
+ 				else {
+-					switch (buf[0]) {
++					switch ((buf[0] << 8) | buf[1]) {
+ 					case EXT_NONE:
+ 					case EXT_PARTIAL:
+ 						status_mesg->ext_type = CWIID_EXT_NONE;
+Index: cwiid/libcwiid/util.c
+===================================================================
+--- cwiid.orig/libcwiid/util.c
++++ cwiid/libcwiid/util.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2007 L. Donnie Smith <cwiid@abstrakraft.org>
++/* Copyright (C) 2007 L. Donnie Smith <donnie.smith@gatech.edu>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License as published by
+@@ -14,38 +14,6 @@
+  *  along with this program; if not, write to the Free Software
+  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+- *  ChangeLog:
+- *  2008-08-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * make cwiid_err_default public
+- *  * clean up cwiid_err
+- *
+- *  2007-04-24 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * rewrite for API overhaul
+- *
+- *  2007-04-09 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * renamed wiimote to libcwiid, renamed structures accordingly
+- *
+- *  2007-04-08 Petter Reinholdtsen <pere@hungry.com>
+- *  * fixed signed/unsigned comparison warning in send_report and
+- *    exec_write_seq
+- *
+- *  2007-04-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * removed cwiid_findfirst (moved to bluetooth.c)
+- *
+- *  2007-03-27 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * moved cwiid_findfirst to bluetooth.c
+- *
+- *  2007-03-14 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * audited error checking (coda and error handler sections)
+- *
+- *  2007-03-05 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * created cwiid_err_func variable
+- *  * created cwiid_err_default
+- *  * added wiimote parameter to cwiid_err definition and calls
+- *
+- *  2007-03-01 L. Donnie Smith <cwiid@abstrakraft.org>
+- *  * Initial ChangeLog
+- *  * type audit (stdint, const, char booleans)
+  */
+ 
+ #include <errno.h>

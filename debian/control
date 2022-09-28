@@ -1,0 +1,97 @@
+Source: cwiid
+Section: utils
+Priority: optional
+Maintainer: Georges Khaznadar <georgesk@debian.org>
+Build-Depends: debhelper-compat (= 13),
+ libtool,
+ automake,
+ autoconf,
+ python3-dev,
+ python3,
+ libpython3-dev,
+ dh-python, 
+ libbluetooth-dev,
+ libgtk2.0-dev,
+ flex,
+ bison
+Standards-Version: 4.6.1
+Homepage: http://abstrakraft.org/cwiid/
+Vcs-Browser: https://salsa.debian.org/georgesk/cwiid
+Vcs-Git: https://salsa.debian.org/georgesk/cwiid.git
+
+
+Package: python3-cwiid
+Architecture: any
+Depends: ${python3:Depends}, ${shlibs:Depends}, libcwiid1 (>= ${binary:Version}), ${misc:Depends}
+Section: python
+Description: library to interface with the wiimote
+ CWiid is a working userspace driver along with various
+ applications implementing event drivers, multiple wiimote
+ connectivity, gesture recognition, and other Wiimote-based
+ functionality.
+ .
+ This package provides the Python cwiid module.
+
+Package: libcwiid1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Section: libs
+Description: library to interface with the wiimote -- runtime files
+ CWiid is a working userspace driver along with various
+ applications implementing event drivers, multiple wiimote
+ connectivity, gesture recognition, and other Wiimote-based
+ functionality.
+ .
+ This package provides the wiimote library that abstracts the interface
+ to the wiimote by hiding the details of the underlying Bluetooth
+ connection.
+
+Package: libcwiid-dev
+Architecture: any
+Depends: libcwiid1 (= ${binary:Version}), libbluetooth-dev, pkg-config, ${misc:Depends}
+Conflicts: libcwiid0-dev
+Replaces: libcwiid0-dev, libcwiid1-dev
+Section: libdevel
+Description: library to interface with the wiimote -- development files
+ CWiid is a working userspace driver along with various
+ applications implementing event drivers, multiple wiimote
+ connectivity, gesture recognition, and other Wiimote-based
+ functionality.
+ .
+ This package provides the development files needed for building against
+ Cwiid.
+
+Package: lswm
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: wiimote discover utility
+ CWiid is a working userspace driver along with various
+ applications implementing event drivers, multiple wiimote
+ connectivity, gesture recognition, and other Wiimote-based
+ functionality.
+ .
+ This package provides an utility to discover new wiimotes.
+
+Package: wmgui
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: GUI interface to the wiimote
+ CWiid is a working userspace driver along with various
+ applications implementing event drivers, multiple wiimote 
+ connectivity, gesture recognition, and other Wiimote-based
+ functionality.
+ .
+ This package provides the GUI to test and display the wiimote data.
+
+Package: wminput
+Architecture: any
+Depends: python3-cwiid, ${shlibs:Depends}, ${misc:Depends}
+Description: Userspace driver for the wiimote
+ CWiid is a working userspace driver along with various
+ applications implementing event drivers, multiple wiimote 
+ connectivity, gesture recognition, and other Wiimote-based
+ functionality.
+ .
+ This package provides an event driver for the wiimote, supporting all
+ buttons (except Power) and pointer tracking, and featuring a tracking 
+ algorithm plugin architecture.

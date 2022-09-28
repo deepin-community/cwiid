@@ -1,0 +1,3 @@
+# the file cwiid.pc contains no architecture specific data
+
+libcwiid-dev: pkg-config-unavailable-for-cross-compilation usr/lib/pkgconfig/cwiid.pc

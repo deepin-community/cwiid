@@ -1,0 +1,5 @@
+version=4
+
+opts="filenamemangle=s%(?:.*?)?cwiid-?(\d[\d.]*)\.tar\.gz%cwiid-$1.tar.gz%" \
+   https://github.com/abstrakraft/cwiid/tags \
+   (?:.*?/)?cwiid-?(\d[\d.]*)\.tar\.gz debian uupdate
