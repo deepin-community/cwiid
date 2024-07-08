@@ -1,8 +1,12 @@
-cwiid (0.6.91-4) UNRELEASED; urgency=medium
+cwiid (0.6.91-4deepin1) unstable; urgency=medium
 
+  [ Georges Khaznadar ]
   * update
 
- -- Georges Khaznadar <georgesk@debian.org>  Tue, 26 Jul 2022 13:57:44 +0800
+  [ Tianyu Chen ]
+  * No source change upload against python 3.12.
+
+ -- Tianyu Chen <sweetyfish@deepin.org>  Mon, 08 Jul 2024 09:49:51 +0200
 
 cwiid (0.6.91-4) unstable; urgency=medium
 
